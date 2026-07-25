@@ -40,7 +40,7 @@ x-common-env: &common-env
   SELF_HOSTED_WEBHOOK_URL: ${SELF_HOSTED_WEBHOOK_URL}
   LOGGING_LEVEL: ${LOGGING_LEVEL}
   ALL_PROXY: ${ALL_PROXY}
-  PROXY_SERVER: ${ALL_PROXY}
+  PROXY_SERVER: ${PROXY_SERVER}
   no_proxy: ${no_proxy}
 
 services:
@@ -51,7 +51,7 @@ services:
     environment:
       PORT: 3000
       ALL_PROXY: ${ALL_PROXY}
-      PROXY_SERVER: ${ALL_PROXY}
+      PROXY_SERVER: ${PROXY_SERVER}
       no_proxy: ${no_proxy}
       ALLOW_LOCAL_WEBHOOKS: ${ALLOW_LOCAL_WEBHOOKS}
       BLOCK_MEDIA: ${BLOCK_MEDIA}
