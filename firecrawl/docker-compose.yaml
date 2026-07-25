@@ -39,9 +39,9 @@ x-common-env: &common-env
   SUPABASE_SERVICE_TOKEN: ${SUPABASE_SERVICE_TOKEN}
   SELF_HOSTED_WEBHOOK_URL: ${SELF_HOSTED_WEBHOOK_URL}
   LOGGING_LEVEL: ${LOGGING_LEVEL}
-  # PROXY_SERVER: [REDACTED - set in /opt/firecrawl/.env]
-  # PROXY_USERNAME: [REDACTED]
-  # PROXY_PASSWORD: [REDACTED]
+  ALL_PROXY: ${ALL_PROXY}
+  PROXY_SERVER: ${ALL_PROXY}
+  no_proxy: ${no_proxy}
 
 services:
   playwright-service:
@@ -50,9 +50,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3000
-      # PROXY_SERVER: [REDACTED - set in /opt/firecrawl/.env]
-      # PROXY_USERNAME: [REDACTED]
-      # PROXY_PASSWORD: [REDACTED]
+      ALL_PROXY: ${ALL_PROXY}
+      PROXY_SERVER: ${ALL_PROXY}
+      no_proxy: ${no_proxy}
       ALLOW_LOCAL_WEBHOOKS: ${ALLOW_LOCAL_WEBHOOKS}
       BLOCK_MEDIA: ${BLOCK_MEDIA}
       MAX_CONCURRENT_PAGES: ${CRAWL_CONCURRENT_REQUESTS:-10}
@@ -152,9 +152,8 @@ services:
       - searxng-data:/etc/searxng
     environment:
       SEARXNG_BASE_URL: "http://localhost:8080"
-      # HTTP_PROXY: [REDACTED - proxy server address]
-      # HTTPS_PROXY: [REDACTED - proxy server address]
-      # NO_PROXY: [REDACTED]
+      ALL_PROXY: ${ALL_PROXY}
+      no_proxy: ${no_proxy}
     cap_add:
       - DAC_OVERRIDE
     logging:
