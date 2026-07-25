@@ -1,14 +1,10 @@
-# 3GPP Expert Skill for Claude
+# 3GPP Expert Skill
 
-A comprehensive 3GPP telecommunications skill that turns Claude into a senior telecom consultant — covering everything from GSM (1992) through 6G (Release 21).
-
-<p align="center">
-  <img src="3killpp.jpeg" alt="3GPP Expert Skill" width="300">
-</p>
+A comprehensive 3GPP telecommunications skill — covering everything from GSM (1992) through 6G (Release 21). Forked from [lugasia/3gpp-skill](https://github.com/lugasia/3gpp-skill).
 
 ## What It Does
 
-This skill gives Claude deep, standards-grounded expertise across the full 3GPP ecosystem:
+This skill provides deep, standards-grounded expertise across the full 3GPP ecosystem:
 
 - **All generations**: 2G/GSM, 3G/UMTS, 4G/LTE, 5G NR, 5G-Advanced, 6G
 - **All releases**: Phase 1 through Release 21, with detailed feature breakdowns
@@ -18,52 +14,26 @@ This skill gives Claude deep, standards-grounded expertise across the full 3GPP 
 - **Security**: Authentication (EPS-AKA, 5G-AKA), SUPI/SUCI, IMSI catcher analysis
 - **Practical consulting**: Link budgets, cell planning, troubleshooting, interoperability
 
-## Example Questions It Handles
+## Spec Download & Reading
 
-**Deep protocol questions:**
-> "Walk me through how a UE scans for and selects the best cell, from power-on to RRC Connected."
+For detailed protocol/procedure questions, the skill can:
 
-**PHY layer precision:**
-> "What sequence is used for PSS in 5G NR?" — correctly answers m-sequence (not Zadoff-Chu, which is a common AI hallucination)
+1. **Download** the actual 3GPP specification from `ftp://ftp.3gpp.org/Specs/archive/`
+2. **Read** the specification document directly — scan headings, identify relevant sections, and extract table definitions with presence rules (M/C/O)
+3. **Cite** exact section numbers and spec versions in answers
 
-**Cross-generation comparisons:**
-> "Explain the differences between LTE and 5G NR RRC state machines. What is RRC_INACTIVE?"
-
-**Security analysis:**
-> "How does 5G's SUPI/SUCI mechanism protect against IMSI catchers? What vulnerabilities remain?"
-
-**Deployment planning:**
-> "We're migrating from LTE/EPC to 5G on a budget. Walk me through the NSA vs SA options."
-
-## Installation
-
-### Claude Desktop (Cowork)
-
-1. Download `3gpp-expert.skill` from [Releases](https://github.com/lugasia/3gpp-skill/releases)
-2. Open it — Claude will prompt you to install
-
-### Manual Install
-
-Copy the `3gpp-expert/` folder (containing `SKILL.md` and `references/`) into your Claude skills directory:
-
-```
-~/.claude/skills/3gpp-expert/
-├── SKILL.md
-└── references/
-    ├── releases.md
-    ├── phy-layer.md
-    └── working-groups.md
-```
+See `references/download.md` and `references/reading-docx.md` for details.
 
 ## What's Inside
 
 | File | Purpose |
 |------|---------|
-| `SKILL.md` | Main skill instructions — 7 knowledge domains, critical PHY facts, response patterns, when to web search |
-| `references/releases.md` | Detailed release-by-release reference (Phase 1 → Rel-21) with spec series table |
-| `references/phy-layer.md` | **NEW** — PHY layer deep-dive: synchronization signals per RAT (PSS/SSS sequences), physical channels, reference signals, RACH preambles, channel mapping |
-| `references/working-groups.md` | **NEW** — Full RAN/SA/CT Working Group structure with owned specs and typical topics |
-| `3gpp-expert.skill` | Pre-packaged installable file |
+| `SKILL.md` | Main skill instructions — 7 knowledge domains, response patterns |
+| `references/releases.md` | Release-by-release reference (Phase 1 → Rel-21) with spec series table |
+| `references/phy-layer.md` | PHY layer deep-dive: synchronization signals, physical channels, RACH |
+| `references/working-groups.md` | RAN/SA/CT Working Group structure with owned specs |
+| `references/download.md` | How to download specs from ftp.3gpp.org |
+| `references/reading-docx.md` | Methodology for reading long spec .docx files |
 
 ## Coverage
 
@@ -82,25 +52,8 @@ Copy the `3gpp-expert/` folder (containing `SKILL.md` and `references/`) into yo
 
 Covers TS 21–38 series with go-to specs for architecture (TS 23.501), NR radio (TS 38.xxx), NAS (TS 24.501), security (TS 33.501), and more.
 
-## Contributing
-
-Contributions are welcome! If you spot an inaccuracy, want to add coverage for a specific topic, or have suggestions:
-
-1. Open an issue describing the improvement
-2. Fork the repo and submit a PR
-3. Make sure any spec references are accurate and cite the correct TS/TR numbers
-
-## Support This Project
-
-If you find this skill useful, consider supporting its development:
-
-- [GitHub Sponsors](https://github.com/sponsors/lugasia)
-- Star this repo to help others find it
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
----
-
-Built by [@lugasia](https://github.com/lugasia)
+Built by [@lugasia](https://github.com/lugasia).
