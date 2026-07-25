@@ -39,23 +39,33 @@ curl -s http://localhost:3002/v1/scrape \
 
 ## Proxy Configuration
 
-The proxy is configured via environment variables:
+Two proxy channels are configured for different components:
 
-- `ALL_PROXY` — proxy for all HTTP/HTTPS traffic (e.g. `http://proxy:8080`)
-- `no_proxy` — comma-separated bypass list (`localhost,127.0.0.1,.local,10.0.0.0/8,...`)
+| Variable | Protocol | Used By |
+|----------|----------|---------|
+| `ALL_PROXY` | `http://...` | Node.js `undici` fetch, curl, Python tools (SearXNG) |
+| `PROXY_SERVER` | `socks5://...` | Playwright / Chromium browser engine |
+
+This split is necessary because Chromium requires SOCKS5 for HTTPS pages through a proxy, while Node.js and Python tools prefer HTTP proxy.
+
+- `no_proxy` — comma-separated bypass list for both channels
 
 These are wired into:
-- Firecrawl API workers (via `undici` — Node.js HTTP client)
-- Playwright service (via `browser.newContext({ proxy })` + Chromium env)
-- SearXNG (via `outgoing.proxies` removed in favor of `ALL_PROXY` env var)
+- **Firecrawl API workers** — via `ALL_PROXY` (Node.js `undici` HTTP client)
+- **Playwright service** — via `PROXY_SERVER` (Chromium `browser.newContext({ proxy })`) + `ALL_PROXY` for other tools
+- **SearXNG** — via `ALL_PROXY` (Python `requests`/`urllib3`)
+
+Default bypass: `localhost,127.0.0.1,.local,192.168.0.0/16,172.16.0.0/12`
 
 ## Secrets to Replace
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `POSTGRES_PASSWORD` | `firecrawl_password` | DB password |
-| `BULL_AUTH_KEY` | `firecrawl-bull-key` | Queue dashboard auth |
+| `POSTGRES_PASSWORD` | `change-me` | DB password |
+| `BULL_AUTH_KEY` | `change-me` | Queue dashboard auth |
 | `searxng/settings.yml:secret_key` | `change-me-to-a-random-secret` | Cookie signing key, generate via `openssl rand -base64 32` |
+| `PROXY_SERVER` | `socks5://...` | Your SOCKS5 proxy address |
+| `ALL_PROXY` | `http://...` | Your HTTP proxy address |
 
 ## Notes
 
