@@ -2,10 +2,8 @@
 
 ## Base URL
 
-All 3GPP specifications are available at:
-
 ```
-https://www.3gpp.org/ftp/Specs/archive/
+ftp://ftp.3gpp.org/Specs/archive/
 ```
 
 ## Directory Structure
@@ -13,8 +11,6 @@ https://www.3gpp.org/ftp/Specs/archive/
 ```
 Specs/archive/
 ├── 21_series/         # Requirements
-│   └── 21.xxx/
-│       └── 21xxx-vv.zip
 ├── 23_series/         # Architecture (e.g. TS 23.501)
 ├── 24_series/         # UE-network signaling
 ├── 29_series/         # Core network protocols
@@ -29,29 +25,59 @@ Specs/archive/
 
 Each spec has its own directory containing versioned zip files.
 
-## Download Command
+## Workflow: List → Pick → Download → Read
+
+### Step 1: List available versions
 
 ```bash
-# Using curl
-curl -LO "https://www.3gpp.org/ftp/Specs/archive/29_series/29.518/29518-k00.zip"
-
-# Using wget
-wget "https://www.3gpp.org/ftp/Specs/archive/29_series/29.518/29518-k00.zip"
+curl -s "ftp://ftp.3gpp.org/Specs/archive/38_series/38.300/"
 ```
 
-## Version Naming
+Returns a listing like:
 
-File format: `{spec_no_dots}-{version_code}.zip`
+```
+38300-ia0.zip    (6.3MB)  # Rel-18
+38300-j20.zip    (7.9MB)  # Rel-19
+38300-j30.zip    (7.7MB)  # Rel-19, newer
+```
 
-Version codes:
-- `fXX` → Rel-15 (e.g. `f10` = v15.1.0)
-- `gXX` → Rel-16
-- `hXX` → Rel-17
-- `iXX` → Rel-18
-- `jXX` → Rel-19
-- `kXX` → Rel-20
+### Step 2: Pick the latest version
 
-The highest version in a spec directory is usually the latest.
+Version code letters sort alphabetically: `a < b < ... < f < g < h < i < j < k`
+
+So `j30` > `j20` > `ia0`. Pick the one with the highest letter and number.
+
+### Step 3: Download
+
+```bash
+curl -LO "ftp://ftp.3gpp.org/Specs/archive/38_series/38.300/38300-j30.zip"
+```
+
+The URL pattern is:
+```
+ftp://ftp.3gpp.org/Specs/archive/{series}_series/{spec_no_dots}/{filename}
+```
+
+Where `{series}` is the numeric series (38, 23, 29, etc.), `{spec_no_dots}` is the spec number without dots (38300), and `{filename}` is the zip filename from the listing.
+
+### Step 4: Extract and read
+
+```bash
+unzip -o 38300-j30.zip -d ./38300-j30
+```
+
+Then use `read_file` on the `.docx` — it handles Word documents automatically.
+
+## Version Code Reference
+
+| Letter | Release | Example |
+|--------|---------|---------|
+| f | Rel-15 | `f00` = v15.0.0, `f10` = v15.1.0 |
+| g | Rel-16 | `g00` = v16.0.0 |
+| h | Rel-17 | `h00` = v17.0.0 |
+| i | Rel-18 | `i00` = v18.0.0, `ia0` = v18.10.0 |
+| j | Rel-19 | `j00` = v19.0.0 |
+| k | Rel-20 | `k00` = v20.0.0 |
 
 ## ZIP Contents
 
@@ -62,19 +88,9 @@ Most spec zips contain:
 | `{spec}-{version}.docx` | Word | Formal specification text |
 | `TS{spec}_{Service}.yaml` | YAML/OpenAPI | API definitions (for 29-series) |
 
-## Reading the Spec
-
-```bash
-# Unzip
-unzip -o 29518-k00.zip -d ./29518-k00
-
-# Read with standard tools (read_file handles .docx automatically)
-# Inside the agent, just use read_file on the .docx directly
-```
-
 ## Tips
 
-- Always download the **latest version** (highest letter) for the most up-to-date specification
-- Previous versions are kept in the same directory for reference
-- The `read_file` tool can extract text from .docx files directly — no need for extra conversion
-- OpenAPI YAML files (for 29-series core network specs) contain the exact REST API definitions
+- Always pick the **latest version** (highest letter + number combo) from the directory listing
+- Previous versions remain in the directory for reference
+- `read_file` extracts .docx text automatically — no extra conversion needed
+- OpenAPI YAML files (29-series) contain exact REST API definitions

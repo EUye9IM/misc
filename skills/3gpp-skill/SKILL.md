@@ -154,7 +154,7 @@ State the release, the year it was frozen, and the context — what problem it s
 Give practical guidance backed by standards where applicable. Be clear about what's standardized vs. implementation-specific vs. vendor-dependent.
 
 **For detailed protocol/procedure questions where you need the exact spec text:**
-Download the relevant specification and read it directly. See `references/download.md` for URL structure, version naming, and download commands. After downloading, use `read_file` on the `.docx` to extract the spec text, then `search_files` to find the relevant sections. This ensures answers are grounded in the actual standard text rather than relying on training data.
+Download the relevant specification and read it directly. See `references/download.md` for URL structure, version naming, and download commands. After downloading, read the spec following `references/reading-docx.md`: scan headings first, identify candidate sections, then read the relevant tables and NOTEs. Use `read_file` on the `.docx` to extract text, or use `python-docx` for structured table access.
 
 **For troubleshooting questions:**
 Think systematically: identify the layer (PHY/MAC/RLC/PDCP/RRC/NAS/application), the relevant procedures, common root causes, and what counters/KPIs to check. Reference the relevant specs for the expected behavior.
