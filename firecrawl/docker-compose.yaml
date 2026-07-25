@@ -1,0 +1,170 @@
+name: firecrawl
+
+x-common-service: &common-service
+  image: ghcr.io/firecrawl/firecrawl:latest
+  network_mode: host
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+      compress: "true"
+
+x-common-env: &common-env
+  REDIS_URL: ${REDIS_URL:-redis://localhost:6379}
+  REDIS_RATE_LIMIT_URL: ${REDIS_RATE_LIMIT_URL:-redis://localhost:6379}
+  PLAYWRIGHT_MICROSERVICE_URL: ${PLAYWRIGHT_MICROSERVICE_URL:-http://localhost:3000/scrape}
+  POSTGRES_USER: ${POSTGRES_USER:-firecrawl}
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-firecrawl_password}"
+  POSTGRES_DB: ${POSTGRES_DB:-firecrawl}
+  POSTGRES_HOST: ${POSTGRES_HOST:-localhost}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  USE_DB_AUTHENTICATION: ${USE_DB_AUTHENTICATION:-false}
+  NUM_WORKERS_PER_QUEUE: ${NUM_WORKERS_PER_QUEUE:-8}
+  CRAWL_CONCURRENT_REQUESTS: ${CRAWL_CONCURRENT_REQUESTS:-10}
+  MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-5}
+  BROWSER_POOL_SIZE: ${BROWSER_POOL_SIZE:-5}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+  MODEL_NAME: ${MODEL_NAME}
+  MODEL_EMBEDDING_NAME: ${MODEL_EMBEDDING_NAME}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+  AUTUMN_SECRET_KEY: ${AUTUMN_SECRET_KEY}
+  SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+  BULL_AUTH_KEY: ${BULL_AUTH_KEY:-firecrawl-bull-key}
+  TEST_API_KEY: ${TEST_API_KEY}
+  SUPABASE_ANON_TOKEN: ${SUPABASE_ANON_TOKEN}
+  SUPABASE_URL: ${SUPABASE_URL}
+  SUPABASE_SERVICE_TOKEN: ${SUPABASE_SERVICE_TOKEN}
+  SELF_HOSTED_WEBHOOK_URL: ${SELF_HOSTED_WEBHOOK_URL}
+  LOGGING_LEVEL: ${LOGGING_LEVEL}
+  # PROXY_SERVER: [REDACTED - set in /opt/firecrawl/.env]
+  # PROXY_USERNAME: [REDACTED]
+  # PROXY_PASSWORD: [REDACTED]
+
+services:
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      # PROXY_SERVER: [REDACTED - set in /opt/firecrawl/.env]
+      # PROXY_USERNAME: [REDACTED]
+      # PROXY_PASSWORD: [REDACTED]
+      ALLOW_LOCAL_WEBHOOKS: ${ALLOW_LOCAL_WEBHOOKS}
+      BLOCK_MEDIA: ${BLOCK_MEDIA}
+      MAX_CONCURRENT_PAGES: ${CRAWL_CONCURRENT_REQUESTS:-10}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    tmpfs:
+      - /tmp/.cache:noexec,nosuid,size=1g
+
+  api:
+    <<: *common-service
+    environment:
+      <<: *common-env
+      HOST: "0.0.0.0"
+      PORT: ${INTERNAL_PORT:-3002}
+      EXTRACT_WORKER_PORT: ${EXTRACT_WORKER_PORT:-3004}
+      WORKER_PORT: ${WORKER_PORT:-3005}
+      NUQ_RABBITMQ_URL: amqp://localhost:5672
+      NUQ_DATABASE_URL: postgresql://firecrawl:firecrawl_password@localhost:5432/firecrawl
+      HARNESS_STARTUP_TIMEOUT_MS: ${HARNESS_STARTUP_TIMEOUT_MS:-120000}
+      ENV: local
+      SEARXNG_ENDPOINT: http://localhost:8080
+    depends_on:
+      redis:
+        condition: service_started
+      playwright-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      nuq-postgres:
+        condition: service_started
+    command: node dist/src/harness.js --start-docker
+
+  redis:
+    image: redis:alpine
+    network_mode: host
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        compress: "true"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "FIRECRAWL_SECRET_COOKIE"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        compress: "true"
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - cron.database_name=firecrawl
+    environment:
+      POSTGRES_USER: firecrawl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-firecrawl_password}
+      POSTGRES_DB: firecrawl
+    volumes:
+      - nuq-postgres-data:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml
+      - searxng-data:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: "http://localhost:8080"
+      # HTTP_PROXY: [REDACTED - proxy server address]
+      # HTTPS_PROXY: [REDACTED - proxy server address]
+      # NO_PROXY: [REDACTED]
+    cap_add:
+      - DAC_OVERRIDE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        compress: "true"
+
+volumes:
+  rabbitmq-data:
+  nuq-postgres-data:
+  searxng-data:

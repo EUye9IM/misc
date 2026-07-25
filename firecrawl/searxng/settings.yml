@@ -1,0 +1,28 @@
+# SearXNG settings.yml for Firecrawl integration
+use_default_settings: true
+
+general:
+  instance_name: "Firecrawl SearXNG"
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "Zf1OumTXmB/3N6Wxr9wad/GnX8mqv/ObWmGoSGgqL1XmehCGPDLsL8yxPNiWKtuL"
+  limiter: false
+  image_proxy: false
+
+ui:
+  static_use_hash: true
+
+redis:
+  url: false
+
+outgoing:
+  request_timeout: 15.0
+  max_request_timeout: 30.0
+  useragent_suffix: ""
+  # proxies: [REDACTED - proxy server address]
