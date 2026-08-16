@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# dshweb — 按需把 DeepSeek Harness Web 作为后台服务拉起(单脚本,无 up/down 子命令)。
+#
+# 用法:
+#   dshweb                确保后台服务在跑(不在则 nohup 拉起),打印 URL,默认打开浏览器
+#   dshweb --no-open      只启动/确认,不打开浏览器
+#   dshweb --port 8080    换端口(默认 3080,也可用环境变量 $DSH_WEB_PORT)
+#   dshweb --stop         停止后台服务(读 $DSH_HOME/web.pid)
+#   dshweb -h | --help    帮助
+#
+# 设计:重复运行自动复用已启动的实例;浏览器打开默认开启,可用 --no-open 关闭。
+set -euo pipefail
+
+# ---- 配置 ----------------------------------------------------------------
+PORT="${DSH_WEB_PORT:-3080}"
+HOST="127.0.0.1"
+URL="http://${HOST}:${PORT}"
+DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
+PID_FILE="${DSH_HOME}/web.pid"
+LOG_FILE="${DSH_HOME}/web.log"
+OPEN_BROWSER=1                # 默认打开浏览器;--no-open 关闭
+START_TIMEOUT="${DSH_WEB_START_TIMEOUT:-90}"
+STOP=0
+
+# ---- 参数 ----------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-open) OPEN_BROWSER=0; shift ;;
+    --port) PORT="$2"; URL="http://${HOST}:${PORT}"; shift 2 ;;
+    --stop) STOP=1; shift ;;
+    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "dshweb: 未知参数: $1 (见 -h)" >&2; exit 2 ;;
+  esac
+done
+
+# ---- 定位 node 与 dsh -----------------------------------------------------
+NODE_BIN="$(command -v node || true)"
+resolve_dsh() {
+  local bin
+  bin="$(command -v dsh 2>/dev/null || true)"
+  if [[ -n "$bin" && -x "$bin" ]]; then echo "$bin"; return; fi
+  # npx 缓存里的 dsh(取最新)
+  bin="$(ls -t "$HOME"/.npm/_npx/*/node_modules/.bin/dsh 2>/dev/null | head -n1 || true)"
+  if [[ -n "$bin" && -x "$bin" ]]; then echo "$bin"; return; fi
+  echo ""
+}
+DSH_BIN="$(resolve_dsh)"
+if [[ -z "$NODE_BIN" ]]; then
+  echo "dshweb: 找不到 node,请确认已安装 Node.js" >&2
+  exit 1
+fi
+if [[ -z "$DSH_BIN" ]]; then
+  echo "dshweb: 找不到 dsh,请先执行: npx --yes @deepseek-ai/dsh@0.1.0-rc.6 web" >&2
+  exit 1
+fi
+
+# ---- 探活:以页面是否注入 __DSH_BOOT__ 为准 ---------------------------------
+# 探测必须绕过代理:环境里若有 http_proxy/https_proxy 且无 no_proxy,
+# 对 127.0.0.1 的请求会被代理拦截(常见返回 503),造成误判。
+probe_curl() {
+  curl -fsS --noproxy '*' --max-time 3 "$1" 2>/dev/null
+}
+is_running() {
+  probe_curl "$URL/" | grep -q "__DSH_BOOT__"
+}
+# 端口有响应但内容不是 dsh 页面(如 503/其他服务)→ 返回 0(真),否则 1
+port_has_foreign_response() {
+  probe_curl "$URL/" >/dev/null 2>&1
+}
+
+# ---- 停止 ----------------------------------------------------------------
+stop_service() {
+  if [[ -f "$PID_FILE" ]]; then
+    local pid
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      echo "dshweb: 停止后台服务 (pid $pid)"
+      kill -TERM "$pid" 2>/dev/null || true
+      for _ in $(seq 1 30); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+      done
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+    else
+      echo "dshweb: pid 文件存在但进程未运行,清理残留"
+    fi
+    rm -f "$PID_FILE"
+  else
+    echo "dshweb: 没有 pid 文件 ($PID_FILE),似乎未在后台运行"
+  fi
+  exit 0
+}
+[[ "$STOP" == 1 ]] && stop_service
+
+# ---- WSL 环境检测 --------------------------------------------------------
+# 仅在 WSL 下才走 cmd.exe/explorer.exe 的 Windows 打开路线;Linux 原生环境
+# (xdg-open)完全不受影响。
+is_wsl() {
+  [[ -n "${WSL_INTEROP:-}" ]] && return 0
+  [[ -f /proc/version ]] && grep -qi microsoft /proc/version && return 0
+  return 1
+}
+
+# ---- 打开浏览器 ----------------------------------------------------------
+# WSL2 下 explorer.exe 对 URL 常静默失败(exit=1);cmd.exe /c start 可用,
+# 但 cwd 在 Linux 路径时 UNC 映射会弄坏 URL,必须先 cd 到 Windows 路径。
+# Linux 原生环境优先 xdg-open。
+open_browser() {
+  local prev_cwd
+  prev_cwd="$(pwd)"
+  if is_wsl; then
+    # 1) WSL 首选:cmd.exe /c start(先切到 Windows 目录,用完后恢复 cwd)
+    if command -v cmd.exe >/dev/null 2>&1; then
+      if cd /mnt/c 2>/dev/null; then
+        nohup cmd.exe /c start "" "$URL" >/dev/null 2>&1 &
+        cd "$prev_cwd"
+        return 0
+      fi
+    fi
+    # 2) WSL 备选:explorer.exe / wslview / xdg-open
+    for c in explorer.exe wslview xdg-open; do
+      if command -v "$c" >/dev/null 2>&1; then
+        nohup "$c" "$URL" >/dev/null 2>&1 &
+        return 0
+      fi
+    done
+  else
+    # Linux 原生:xdg-open 优先,其次 wslview(若有)
+    for c in xdg-open wslview; do
+      if command -v "$c" >/dev/null 2>&1; then
+        nohup "$c" "$URL" >/dev/null 2>&1 &
+        return 0
+      fi
+    done
+  fi
+  echo "dshweb: 未找到浏览器打开器,请手动访问 $URL"
+}
+
+# 已在运行 → 直接复用,不重复拉起
+if is_running; then
+  echo "dsh web: $URL (已在运行)"
+  [[ "$OPEN_BROWSER" == 1 ]] && open_browser
+  exit 0
+fi
+
+# 端口被非 dsh 服务占用 → 提示换端口,避免误拉
+if port_has_foreign_response; then
+  echo "dshweb: 端口 $PORT 有响应但不是 dsh web(可能是 503 或别的服务),请先停掉占用进程或用 --port 换端口" >&2
+  echo "dshweb: 可执行: pkill -f 'dsh web' 或自行处理占用 3080 的进程" >&2
+  exit 1
+fi
+
+# ---- 冷启动:后台拉起 ------------------------------------------------------
+mkdir -p "$DSH_HOME"
+echo "dshweb: 启动后台服务 → $URL"
+echo "dshweb: 日志 $LOG_FILE,pid 文件 $PID_FILE"
+export DSH_HOME
+# 关键:注入 no_proxy,确保 dsh 内部对 127.0.0.1 的请求不走代理
+# (环境里若有 http_proxy/https_proxy 而无 no_proxy,代理会拦截本地请求导致 503)
+export no_proxy="${no_proxy:+$no_proxy,}127.0.0.1,localhost"
+export NO_PROXY="${NO_PROXY:+$NO_PROXY,}127.0.0.1,localhost"
+nohup "$NODE_BIN" "$DSH_BIN" web --port "$PORT" >>"$LOG_FILE" 2>&1 </dev/null &
+echo $! > "$PID_FILE"
+
+# 等待就绪
+for i in $(seq 1 "$START_TIMEOUT"); do
+  if is_running; then
+    echo "dsh web: $URL (已就绪, ${i}s)"
+    [[ "$OPEN_BROWSER" == 1 ]] && open_browser
+    exit 0
+  fi
+  # 端口已被占用(非 dsh 或 503)→ 停止等待,避免循环拉起
+  if port_has_foreign_response; then
+    echo "dshweb: 端口 $PORT 已有响应但页面未就绪(常见 503,多为代理拦截本地请求),等待放弃" >&2
+    echo "dshweb: 最近日志:" >&2
+    tail -n 20 "$LOG_FILE" >&2 || true
+    exit 1
+  fi
+  if ! kill -0 "$(cat "$PID_FILE" 2>/dev/null || echo 0)" 2>/dev/null; then
+    echo "dshweb: 后台进程已退出,最近日志:" >&2
+    tail -n 30 "$LOG_FILE" >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "dshweb: 启动超时(${START_TIMEOUT}s),最近日志:" >&2
+tail -n 30 "$LOG_FILE" >&2 || true
+exit 1
