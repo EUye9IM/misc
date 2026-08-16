@@ -1,0 +1,9 @@
+# 本机网络环境的临时 SSH 隧道 helper：
+# 供 git push/pull 通过 HTTP 代理(192.168.1.2:24580)走 ssh.github.com:443 连 GitHub，
+# 由本机 git config 的 core.sshCommand 引用。依赖特定代理地址，不提交。
+.githelpers_ssh_tunnel.py
+
+# 常见编辑/系统杂项
+.DS_Store
+*.swp
+*.log
